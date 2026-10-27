@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NomadBudget AI - Travel & Daily Tracker</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            950: '#051411',
+                            900: '#092420',
+                            800: '#113b34',
+                            700: '#185248',
+                            600: '#237063',
+                            500: '#349383',
+                            400: '#4fbda9',
+                            300: '#7ad4c3',
+                            200: '#aae5d9',
+                            100: '#d7f4ee',
+                        },
+                        sage: {
+                            100: '#eef5f3',
+                            200: '#cce2dc',
+                            300: '#9bbfb5',
+                            400: '#6f998d',
+                            500: '#4f756a',
+                        },
+                        amber: {
+                            400: '#ecc14d',
+                            500: '#d9a726',
+                            600: '#b58514',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-deep: #040f0d;
+            --card-bg: rgba(9, 36, 32, 0.85);
+            --card-border: rgba(79, 189, 169, 0.18);
+        }
+
+        html, body {
+            height: 100%;
+            height: 100dvh;
+            width: 100%;
+            overflow: hidden;
+            background-color: var(--bg-deep);
+            color: #eef5f3;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        /* Prevent scroll bleed on mobile */
+        .scrollable-content {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .scrollable-content::-webkit-scrollbar {
+            display: none;
+        }
+
+        .numpad-btn {
+            transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .numpad-btn:active {
+            transform: scale(0.94);
+            background-color: #185248 !important;
+            box-shadow: 0 0 10px rgba(79, 189, 169, 0.3);
+        }
+
+        .glass-card {
+            background: linear-gradient(145deg, rgba(9, 36, 32, 0.9), rgba(5, 20, 17, 0.95));
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.6);
+        }
+
+        .star-rating { direction: rtl; display: inline-flex; }
+        .star-rating input { display: none; }
+        .star-rating label { color: #237063; cursor: pointer; transition: all 0.15s ease; }
+        .star-rating input:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #ecc14d;
+            text-shadow: 0 0 6px rgba(236, 193, 77, 0.4);
+        }
+
+        .tab-content {
+            animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(3px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .nav-btn.active {
+            color: #4fbda9;
+        }
+        .nav-btn.active i {
+            transform: translateY(-1px);
+            filter: drop-shadow(0 2px 6px rgba(79, 189, 169, 0.5));
+        }
+
+        #toast {
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+    </style>
+</head>
+<body class="antialiased flex flex-col h-full w-full select-none">
+
+    <!-- Header (Sticky Top) -->
+    <header class="flex-none bg-emerald-950/95 backdrop-blur-md border-b border-emerald-800/30 px-3.5 py-2.5 flex items-center justify-between z-30 pt-safe">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 text-emerald-100 flex items-center justify-center font-bold text-xs shadow-md border border-emerald-400/20">
+                <i class="fa-solid fa-compass text-amber-400"></i>
+            </div>
+            <div>
+                <button onclick="openLocationModal()" class="flex items-center gap-1.5 text-xs font-bold text-slate-100 hover:text-emerald-300 transition-colors text-left">
+                    <span id="activeHeaderLocation">Thailand / Koh Tao</span>
+                    <i class="fa-solid fa-pen-to-square text-[10px] text-emerald-400/70"></i>
+                </button>
+                <div class="flex items-center gap-1 text-[10px] text-sage-300">
+                    <span>Base:</span>
+                    <button onclick="openCurrencyConfigModal()" class="font-mono font-bold text-amber-400 underline decoration-amber-400/40 hover:text-amber-300" id="headerDisplayCurrency">
+                        USD ($)
+                    </button>
+                    <span>•</span>
+                    <span id="activeFolderBadge" class="bg-emerald-900/60 px-1.5 py-0.2 rounded border border-emerald-700/40 text-emerald-200">Active</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+            <button onclick="promptCloseTab('city')" class="px-2 py-1 rounded-xl bg-emerald-900/60 hover:bg-emerald-800/60 text-emerald-300 text-[10px] font-semibold flex items-center gap-1 border border-emerald-700/40 active:scale-95 transition-all">
+                <i class="fa-solid fa-city text-amber-400 text-[9px]"></i>
+                <span>Close City</span>
+            </button>
+            <button onclick="promptCloseTab('country')" class="px-2 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-[10px] font-semibold flex items-center gap-1 border border-amber-500/30 active:scale-95 transition-all">
+                <i class="fa-solid fa-flag-checkered text-[9px]"></i>
+                <span>Close Country</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main View Container (Fills exact remaining viewport height) -->
+    <main class="flex-1 min-h-0 w-full max-w-md mx-auto relative overflow-hidden">
+
+        <!-- TAB 1: QUICK ENTRY SCREEN (DEFAULT - STRICT ZERO-SCROLL) -->
+        <section id="view-entry" class="tab-content h-full p-3 flex flex-col justify-between overflow-hidden">
+            <div class="glass-card rounded-3xl p-3 flex flex-col justify-between flex-1 gap-2 border border-emerald-800/40">
+                
+                <!-- Type Selector -->
+                <div class="grid grid-cols-3 gap-1 p-1 bg-emerald-950/90 rounded-2xl border border-emerald-800/40">
+                    <button onclick="setTxType('expense')" id="txType-expense" class="py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md transition-all">
+                        Expense
+                    </button>
+                    <button onclick="setTxType('active_income')" id="txType-active_income" class="py-1.5 rounded-xl text-[11px] font-bold text-sage-300 hover:text-white transition-all">
+                        + Active Inc.
+                    </button>
+                    <button onclick="setTxType('passive_income')" id="txType-passive_income" class="py-1.5 rounded-xl text-[11px] font-bold text-sage-300 hover:text-white transition-all">
+                        + Passive Inc.
+                    </button>
+                </div>
+
+                <!-- Date & Currency Bar -->
+                <div class="flex justify-between items-center text-[10px] px-1">
+                    <button onclick="toggleBackdateField()" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold transition-colors">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span id="dateToggleText">Current Time</span>
+                    </button>
+
+                    <div class="flex items-center gap-1 text-sage-300">
+                        <span>Currency:</span>
+                        <select id="logCurrencySelect" onchange="changeLogCurrency(this.value)" class="bg-emerald-950 text-amber-400 font-mono font-bold text-[11px] rounded-lg px-1.5 py-0.5 border border-emerald-700/50 focus:outline-none focus:border-amber-400">
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Backdate Input (Collapsible) -->
+                <div id="backdateContainer" class="hidden bg-emerald-950/90 p-2 rounded-2xl border border-emerald-800/40">
+                    <input type="datetime-local" id="expenseDateTime" class="w-full bg-emerald-900/40 border border-emerald-700/40 rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none font-mono">
+                </div>
+
+                <!-- Keypad Display Box -->
+                <div class="bg-emerald-950/95 rounded-2xl p-2.5 border border-emerald-800/50 text-right shadow-inner flex flex-col justify-center">
+                    <div class="flex justify-between items-center text-[9px] font-bold tracking-wider uppercase">
+                        <span id="entryTxLabel" class="text-emerald-400 flex items-center gap-1">
+                            <i class="fa-solid fa-wallet"></i> EXPENSE LOG
+                        </span>
+                        <span id="entryCurrencyCode" class="font-mono text-amber-400">THB ฿</span>
+                    </div>
+                    <div id="numpadDisplay" class="text-3xl font-mono font-bold text-white tracking-tight overflow-x-auto py-0.5">0</div>
+                </div>
+
+                <!-- Category Selector -->
+                <div class="grid grid-cols-6 gap-1" id="categoryGrid">
+                    <button onclick="selectCategory('Food', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-600 text-white border border-emerald-400/40 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-utensils text-[11px] mb-0.5 text-amber-300"></i> Food
+                    </button>
+                    <button onclick="selectCategory('Transport', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-950/80 text-sage-300 border border-emerald-800/30 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-taxi text-[11px] mb-0.5 text-emerald-400"></i> Transit
+                    </button>
+                    <button onclick="selectCategory('Lodging', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-950/80 text-sage-300 border border-emerald-800/30 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-hotel text-[11px] mb-0.5 text-emerald-300"></i> Stay
+                    </button>
+                    <button onclick="selectCategory('Activities', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-950/80 text-sage-300 border border-emerald-800/30 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-ticket text-[11px] mb-0.5 text-amber-400"></i> Fun
+                    </button>
+                    <button onclick="selectCategory('Gear', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-950/80 text-sage-300 border border-emerald-800/30 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-bag-shopping text-[11px] mb-0.5 text-emerald-200"></i> Gear
+                    </button>
+                    <button onclick="selectCategory('Misc', this)" class="cat-btn flex flex-col items-center justify-center p-1.5 rounded-xl bg-emerald-950/80 text-sage-300 border border-emerald-800/30 text-[9px] font-semibold transition-all">
+                        <i class="fa-solid fa-ellipsis text-[11px] mb-0.5 text-sage-300"></i> Misc
+                    </button>
+                </div>
+
+                <!-- Detail Input -->
+                <input type="text" id="expenseNote" placeholder="Detail (e.g. Pad Thai noodles, Taxi)" class="w-full bg-emerald-950/80 border border-emerald-800/40 rounded-xl px-3 py-1.5 text-xs text-white placeholder-sage-400 focus:outline-none focus:border-emerald-400 transition-colors">
+
+                <!-- Satisfaction Rating -->
+                <div class="flex items-center justify-between bg-emerald-950/80 px-3 py-1 rounded-xl border border-emerald-800/40" id="satisfactionRow">
+                    <span class="text-[10px] text-sage-300 font-semibold">Value / Satisfaction:</span>
+                    <div class="star-rating text-xs">
+                        <input type="radio" id="star5" name="satisfaction" value="5" /><label for="star5"><i class="fa-solid fa-star"></i></label>
+                        <input type="radio" id="star4" name="satisfaction" value="4" /><label for="star4"><i class="fa-solid fa-star"></i></label>
+                        <input type="radio" id="star3" name="satisfaction" value="3" checked /><label for="star3"><i class="fa-solid fa-star"></i></label>
+                        <input type="radio" id="star2" name="satisfaction" value="2" /><label for="star2"><i class="fa-solid fa-star"></i></label>
+                        <input type="radio" id="star1" name="satisfaction" value="1" /><label for="star1"><i class="fa-solid fa-star"></i></label>
+                    </div>
+                </div>
+
+                <!-- Touch Keypad Grid -->
+                <div class="grid grid-cols-3 gap-1.5">
+                    <button onclick="pressNumpad('1')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">1</button>
+                    <button onclick="pressNumpad('2')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">2</button>
+                    <button onclick="pressNumpad('3')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">3</button>
+                    <button onclick="pressNumpad('4')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">4</button>
+                    <button onclick="pressNumpad('5')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">5</button>
+                    <button onclick="pressNumpad('6')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">6</button>
+                    <button onclick="pressNumpad('7')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">7</button>
+                    <button onclick="pressNumpad('8')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">8</button>
+                    <button onclick="pressNumpad('9')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">9</button>
+                    <button onclick="pressNumpad('.')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">.</button>
+                    <button onclick="pressNumpad('0')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-white font-mono font-bold text-base flex items-center justify-center">0</button>
+                    <button onclick="pressNumpad('back')" class="numpad-btn h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/30 text-rose-400 font-bold text-base flex items-center justify-center active:bg-rose-950/30">
+                        <i class="fa-solid fa-delete-left"></i>
+                    </button>
+                </div>
+
+                <!-- Save Action Button -->
+                <button onclick="saveTransaction()" id="saveTxBtn" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 text-white font-bold rounded-xl shadow-md text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Log Transaction</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- TAB 2: ANALYTICS & DUAL TIMELINE GRAPHS (INTERNAL SCROLL ONLY) -->
+        <section id="view-analytics" class="tab-content h-full p-3 space-y-3 scrollable-content hidden">
+            <!-- Converted Net Header -->
+            <div class="glass-card rounded-2xl p-3.5 space-y-2">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-sage-300 font-semibold uppercase tracking-wider text-[9px]">Converted Net Balance</span>
+                    <button onclick="openCurrencyConfigModal()" class="text-[9px] bg-emerald-900/60 text-amber-400 px-2 py-0.5 rounded-full border border-emerald-700/50 flex items-center gap-1 font-mono">
+                        <i class="fa-solid fa-coins text-[8px]"></i> <span id="displayCurrencyBadge">USD ($)</span>
+                    </button>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span id="analyticsNetTotal" class="text-2xl font-mono font-extrabold text-white tracking-tight">0.00</span>
+                    <span id="analyticsCurrencyCode" class="text-xs font-mono font-bold text-amber-400">USD</span>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-800/30 text-[10px]">
+                    <div>
+                        <span class="text-sage-400 block text-[8px] uppercase tracking-wider">Expenses</span>
+                        <span id="analyticsTotalExpense" class="font-mono font-bold text-rose-400">0.00</span>
+                    </div>
+                    <div>
+                        <span class="text-sage-400 block text-[8px] uppercase tracking-wider">Active Inc.</span>
+                        <span id="analyticsActiveInc" class="font-mono font-bold text-emerald-400">0.00</span>
+                    </div>
+                    <div>
+                        <span class="text-sage-400 block text-[8px] uppercase tracking-wider">Passive Inc.</span>
+                        <span id="analyticsPassiveInc" class="font-mono font-bold text-amber-400">0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRAPH 1: BY COUNTRY -->
+            <div class="glass-card rounded-2xl p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
+                            <i class="fa-solid fa-globe text-emerald-400"></i> 1. Timeline: By Country
+                        </h3>
+                        <p class="text-[9px] text-sage-300">Daily net spending across trip duration</p>
+                    </div>
+                    <span class="text-[8px] bg-rose-500/10 text-rose-400 px-1.5 py-0.2 rounded-full border border-rose-500/20 font-medium">Spikes Flagged</span>
+                </div>
+                <div class="h-40 w-full">
+                    <canvas id="countryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- GRAPH 2: BY CITY -->
+            <div class="glass-card rounded-2xl p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
+                            <i class="fa-solid fa-city text-amber-400"></i> 2. Comparison: By City
+                        </h3>
+                        <p class="text-[9px] text-sage-300">Total spend aggregated per city segment</p>
+                    </div>
+                </div>
+                <div class="h-40 w-full">
+                    <canvas id="cityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Logged History List -->
+            <div class="glass-card rounded-2xl p-3 space-y-2 mb-6">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-list text-emerald-400"></i> Logged Activity
+                    </h3>
+                    <span class="text-[9px] text-sage-400" id="historyCountTag">0 entries</span>
+                </div>
+                <div id="historyList" class="space-y-1.5 max-h-56 overflow-y-auto scrollable-content"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: AI INSIGHTS & VALUE MATRIX (INTERNAL SCROLL ONLY) -->
+        <section id="view-insights" class="tab-content h-full p-3 space-y-3 scrollable-content hidden">
+            <div class="glass-card rounded-2xl p-3.5 space-y-2">
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> AI Item & Food Price Analyzer
+                </h3>
+                <div id="aiAnalysisContainer" class="space-y-2 text-xs"></div>
+            </div>
+
+            <div class="glass-card rounded-2xl p-3.5 space-y-2 mb-6">
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-star text-amber-400"></i> Perceived Value Matrix
+                </h3>
+                <div id="satisfactionContainer" class="space-y-1.5 text-xs"></div>
+            </div>
+        </section>
+
+        <!-- TAB 4: RECURRING EXPENSES & INCOME (INTERNAL SCROLL ONLY) -->
+        <section id="view-recurring" class="tab-content h-full p-3 space-y-3 scrollable-content hidden">
+            <div class="glass-card rounded-2xl p-3.5 space-y-2.5">
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrows-rotate text-emerald-400"></i> Add Recurring Rule
+                </h3>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                        <label class="block text-sage-300 text-[10px] mb-1">Title</label>
+                        <input type="text" id="recTitle" placeholder="e.g. Remote Salary" class="w-full bg-emerald-950/80 border border-emerald-800/40 rounded-xl px-2.5 py-1.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sage-300 text-[10px] mb-1">Amount</label>
+                        <input type="number" id="recAmount" placeholder="0.00" class="w-full bg-emerald-950/80 border border-emerald-800/40 rounded-xl px-2.5 py-1.5 text-white font-mono">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <label class="block text-sage-300 text-[10px] mb-1">Type</label>
+                        <select id="recType" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-2 py-1.5 text-white text-[11px]">
+                            <option value="expense">Expense</option>
+                            <option value="active_income">Active Inc.</option>
+                            <option value="passive_income">Passive Inc.</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sage-300 text-[10px] mb-1">Frequency</label>
+                        <select id="recFreq" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-2 py-1.5 text-white text-[11px]">
+                            <option value="Daily">Daily</option>
+                            <option value="Weekly">Weekly</option>
+                            <option value="Monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sage-300 text-[10px] mb-1">Category</label>
+                        <select id="recCat" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-2 py-1.5 text-white text-[11px]">
+                            <option value="Lodging">Lodging</option>
+                            <option value="Food">Food</option>
+                            <option value="Gear">Gear</option>
+                            <option value="Income">Income</option>
+                            <option value="Misc">Misc</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="addRecurringRule()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors">
+                    Save Recurring Rule
+                </button>
+            </div>
+
+            <div class="glass-card rounded-2xl p-3.5 space-y-2 mb-6">
+                <h3 class="text-[11px] font-bold uppercase tracking-wider text-sage-300">Active Rules</h3>
+                <div id="recurringList" class="space-y-1.5 text-xs"></div>
+            </div>
+        </section>
+
+        <!-- TAB 5: VAULT (INTERNAL SCROLL ONLY) -->
+        <section id="view-archive" class="tab-content h-full p-3 space-y-3 scrollable-content hidden">
+            <div class="flex justify-between items-center text-xs px-1">
+                <h3 class="font-bold uppercase tracking-wider text-sage-300 flex items-center gap-1.5 text-[11px]">
+                    <i class="fa-solid fa-box-archive text-amber-400"></i> Destination Vault
+                </h3>
+                <span class="text-[9px] text-sage-400">Immutable Storage</span>
+            </div>
+            <div id="vaultHierarchicalContainer" class="space-y-3 mb-6"></div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar (Fixed Bottom) -->
+    <nav class="flex-none bg-emerald-950/95 backdrop-blur-md border-t border-emerald-800/40 px-2 py-1.5 z-40 pb-safe">
+        <div class="max-w-md mx-auto flex justify-around items-center text-center">
+            <button onclick="switchTab('entry')" id="nav-entry" class="nav-btn active flex flex-col items-center text-sage-400 transition-all">
+                <i class="fa-solid fa-plus-circle text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">Log</span>
+            </button>
+            <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn flex flex-col items-center text-sage-400 transition-all">
+                <i class="fa-solid fa-chart-line text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">Graphs</span>
+            </button>
+            <button onclick="switchTab('insights')" id="nav-insights" class="nav-btn flex flex-col items-center text-sage-400 transition-all">
+                <i class="fa-solid fa-brain text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">Insights</span>
+            </button>
+            <button onclick="switchTab('recurring')" id="nav-recurring" class="nav-btn flex flex-col items-center text-sage-400 transition-all">
+                <i class="fa-solid fa-arrows-rotate text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">Recurring</span>
+            </button>
+            <button onclick="switchTab('archive')" id="nav-archive" class="nav-btn flex flex-col items-center text-sage-400 transition-all">
+                <i class="fa-solid fa-folder-closed text-lg mb-0.5"></i>
+                <span class="text-[9px] font-bold">Vault</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Toast Banner -->
+    <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-emerald-800 text-white text-xs px-3.5 py-1.5 rounded-full shadow-lg border border-emerald-400/30 pointer-events-none opacity-0 transform -translate-y-2 transition-all">
+        Log recorded successfully!
+    </div>
+
+    <!-- Modal: Location Switcher -->
+    <div id="locationModal" class="fixed inset-0 z-50 bg-emerald-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-3xl p-4 w-full max-w-sm space-y-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-earth-americas text-emerald-400"></i> Active Destination
+            </h3>
+            <div>
+                <label class="block text-[10px] text-sage-300 mb-1">Country</label>
+                <input type="text" id="modalCountryInput" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-3 py-1.5 text-xs text-white" placeholder="e.g. Thailand">
+            </div>
+            <div>
+                <label class="block text-[10px] text-sage-300 mb-1">City / Subfolder</label>
+                <input type="text" id="modalCityInput" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-3 py-1.5 text-xs text-white" placeholder="e.g. Koh Tao">
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeLocationModal()" class="flex-1 py-1.5 rounded-xl bg-emerald-950 text-sage-300 text-xs font-semibold border border-emerald-800/30">Cancel</button>
+                <button onclick="saveLocationSettings()" class="flex-1 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow-md">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Base Currency Configuration -->
+    <div id="currencyConfigModal" class="fixed inset-0 z-50 bg-emerald-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-3xl p-4 w-full max-w-sm space-y-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <i class="fa-solid fa-coins text-amber-400"></i> Target Display Currency
+            </h3>
+            <p class="text-[10px] text-sage-300">All local expenses will convert to this currency on graphs & analytics.</p>
+            <div>
+                <select id="baseCurrencySelect" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-3 py-2 text-xs text-white font-mono font-bold">
+                </select>
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeCurrencyConfigModal()" class="flex-1 py-1.5 rounded-xl bg-emerald-950 text-sage-300 text-xs font-semibold border border-emerald-800/30">Close</button>
+                <button onclick="saveBaseCurrency()" class="flex-1 py-1.5 rounded-xl bg-amber-500 text-emerald-950 font-bold text-xs shadow-md">Apply Conversion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Custom Archive Naming -->
+    <div id="closeTabModal" class="fixed inset-0 z-50 bg-emerald-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card rounded-3xl p-4 w-full max-w-sm space-y-3 text-center">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-lg border border-amber-500/30">
+                <i class="fa-solid fa-box-archive"></i>
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-white mb-0.5" id="closeTabModalTitle">Close City Tab</h3>
+                <p class="text-[10px] text-sage-300">Save and freeze current entries into your Vault.</p>
+            </div>
+            <input type="text" id="customArchiveNameInput" class="w-full bg-emerald-950 border border-emerald-800/40 rounded-xl px-3 py-1.5 text-xs text-white text-left" placeholder="e.g. Koh Tao Trip">
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeCloseTabModal()" class="flex-1 py-1.5 rounded-xl bg-emerald-950 text-sage-300 text-xs font-semibold border border-emerald-800/30">Cancel</button>
+                <button onclick="executeCloseTab()" class="flex-1 py-1.5 rounded-xl bg-amber-500 text-emerald-950 font-bold text-xs shadow-md">Save to Vault</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Engine -->
+    <script>
+        const CURRENCIES = {
+            USD: { name: 'US Dollar', symbol: '$', rateToUSD: 1.0 },
+            THB: { name: 'Thai Baht', symbol: '฿', rateToUSD: 0.028 },
+            EUR: { name: 'Euro', symbol: '€', rateToUSD: 1.08 },
+            GBP: { name: 'British Pound', symbol: '£', rateToUSD: 1.27 },
+            CAD: { name: 'Canadian Dollar', symbol: 'CA$', rateToUSD: 0.74 },
+            AUD: { name: 'Australian Dollar', symbol: 'A$', rateToUSD: 0.65 },
+            JPY: { name: 'Japanese Yen', symbol: '¥', rateToUSD: 0.0067 },
+            SGD: { name: 'Singapore Dollar', symbol: 'S$', rateToUSD: 0.74 },
+            MXN: { name: 'Mexican Peso', symbol: 'MX$', rateToUSD: 0.058 }
+        };
+
+        let appState = {
+            currentCountry: "Thailand",
+            currentCity: "Koh Tao",
+            logCurrency: "THB",
+            displayCurrency: "USD",
+            activeExpenses: [],
+            recurringRules: [],
+            vault: {}
+        };
+
+        let activeTxType = "expense";
+        let selectedCategory = "Food";
+        let currentInput = "0";
+        let pendingCloseType = null;
+        let countryChartInstance = null;
+        let cityChartInstance = null;
+
+        function initApp() {
+            const saved = localStorage.getItem('nomadbudget_ai_v5');
+            if (saved) {
+                try {
+                    appState = JSON.parse(saved);
+                } catch(e) { console.error("Error loading state", e); }
+            }
+
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('expenseDateTime').value = now.toISOString().slice(0, 16);
+
+            populateCurrencySelects();
+            updateUI();
+            initCharts();
+        }
+
+        function saveState() {
+            localStorage.setItem('nomadbudget_ai_v5', JSON.stringify(appState));
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('opacity-0', '-translate-y-2');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-2');
+            }, 1800);
+        }
+
+        function convertCurrency(amount, fromCurr, toCurr) {
+            if (fromCurr === toCurr) return amount;
+            const fromRate = CURRENCIES[fromCurr]?.rateToUSD || 1;
+            const toRate = CURRENCIES[toCurr]?.rateToUSD || 1;
+            return (amount * fromRate) / toRate;
+        }
+
+        function populateCurrencySelects() {
+            const logSel = document.getElementById('logCurrencySelect');
+            const baseSel = document.getElementById('baseCurrencySelect');
+
+            logSel.innerHTML = '';
+            baseSel.innerHTML = '';
+
+            Object.keys(CURRENCIES).forEach(code => {
+                const c = CURRENCIES[code];
+                logSel.innerHTML += `<option value="${code}" ${code === appState.logCurrency ? 'selected' : ''}>${code} (${c.symbol})</option>`;
+                baseSel.innerHTML += `<option value="${code}" ${code === appState.displayCurrency ? 'selected' : ''}>${code} - ${c.name} (${c.symbol})</option>`;
+            });
+        }
+
+        function changeLogCurrency(val) {
+            appState.logCurrency = val;
+            document.getElementById('entryCurrencyCode').innerText = `${val} ${CURRENCIES[val].symbol}`;
+            saveState();
+        }
+
+        function openCurrencyConfigModal() {
+            document.getElementById('baseCurrencySelect').value = appState.displayCurrency;
+            document.getElementById('currencyConfigModal').classList.remove('hidden');
+        }
+
+        function closeCurrencyConfigModal() {
+            document.getElementById('currencyConfigModal').classList.add('hidden');
+        }
+
+        function saveBaseCurrency() {
+            appState.displayCurrency = document.getElementById('baseCurrencySelect').value;
+            saveState();
+            updateUI();
+            if (!document.getElementById('view-analytics').classList.contains('hidden')) updateCharts();
+            closeCurrencyConfigModal();
+            showToast(`Base currency set to ${appState.displayCurrency}`);
+        }
+
+        function switchTab(tabName) {
+            ['entry', 'analytics', 'insights', 'recurring', 'archive'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`nav-${t}`);
+                if (btn) btn.classList.remove('active');
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            if (tabName === 'analytics') updateCharts();
+            if (tabName === 'insights') renderAIInsights();
+            if (tabName === 'recurring') renderRecurringRules();
+            if (tabName === 'archive') renderHierarchicalVault();
+        }
+
+        function setTxType(type) {
+            activeTxType = type;
+            ['expense', 'active_income', 'passive_income'].forEach(t => {
+                const btn = document.getElementById(`txType-${t}`);
+                btn.className = "py-1.5 rounded-xl text-[11px] font-bold text-sage-300 hover:text-white transition-all";
+            });
+
+            const currentBtn = document.getElementById(`txType-${type}`);
+            const satRow = document.getElementById('satisfactionRow');
+            const saveBtn = document.getElementById('saveTxBtn');
+
+            if (type === 'expense') {
+                currentBtn.className = "py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-md transition-all";
+                document.getElementById('entryTxLabel').innerHTML = `<i class="fa-solid fa-wallet"></i> EXPENSE LOG`;
+                document.getElementById('entryTxLabel').className = "text-emerald-400";
+                satRow.classList.remove('hidden');
+                saveBtn.className = "w-full py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold rounded-xl shadow-md text-xs flex items-center justify-center gap-2 transition-all";
+            } else if (type === 'active_income') {
+                currentBtn.className = "py-1.5 rounded-xl text-[11px] font-bold bg-emerald-500 text-emerald-950 shadow-md transition-all";
+                document.getElementById('entryTxLabel').innerHTML = `<i class="fa-solid fa-briefcase"></i> ACTIVE INCOME`;
+                document.getElementById('entryTxLabel').className = "text-emerald-300";
+                satRow.classList.add('hidden');
+                saveBtn.className = "w-full py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-emerald-950 font-bold rounded-xl shadow-md text-xs flex items-center justify-center gap-2 transition-all";
+            } else {
+                currentBtn.className = "py-1.5 rounded-xl text-[11px] font-bold bg-amber-500 text-emerald-950 shadow-md transition-all";
+                document.getElementById('entryTxLabel').innerHTML = `<i class="fa-solid fa-chart-line"></i> PASSIVE INCOME`;
+                document.getElementById('entryTxLabel').className = "text-amber-400";
+                satRow.classList.add('hidden');
+                saveBtn.className = "w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-emerald-950 font-bold rounded-xl shadow-md text-xs flex items-center justify-center gap-2 transition-all";
+            }
+        }
+
+        function pressNumpad(val) {
+            if (val === 'back') {
+                currentInput = currentInput.length > 1 ? currentInput.slice(0, -1) : "0";
+            } else if (val === '.') {
+                if (!currentInput.includes('.')) currentInput += '.';
+            } else {
+                if (currentInput === "0") currentInput = val;
+                else currentInput += val;
+            }
+            document.getElementById('numpadDisplay').innerText = currentInput;
+        }
+
+        function toggleBackdateField() {
+            const container = document.getElementById('backdateContainer');
+            const text = document.getElementById('dateToggleText');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                text.innerText = "Backdating Active";
+            } else {
+                container.classList.add('hidden');
+                text.innerText = "Current Time";
+            }
+        }
+
+        function selectCategory(cat, element) {
+            selectedCategory = cat;
+            document.querySelectorAll('#categoryGrid button').forEach(btn => {
+                btn.classList.remove('bg-emerald-600', 'text-white', 'border-emerald-400/40');
+                btn.classList.add('bg-emerald-950/80', 'text-sage-300', 'border-emerald-800/30');
+            });
+            element.classList.remove('bg-emerald-950/80', 'text-sage-300', 'border-emerald-800/30');
+            element.classList.add('bg-emerald-600', 'text-white', 'border-emerald-400/40');
+        }
+
+        function saveTransaction() {
+            const amount = parseFloat(currentInput);
+            if (isNaN(amount) || amount <= 0) return;
+
+            const note = document.getElementById('expenseNote').value.trim() || selectedCategory;
+            const dateVal = document.getElementById('expenseDateTime').value;
+            const rating = parseInt(document.querySelector('input[name="satisfaction"]:checked')?.value || '3');
+
+            const newTx = {
+                id: Date.now(),
+                amount: amount,
+                currency: appState.logCurrency,
+                type: activeTxType,
+                category: selectedCategory,
+                note: note,
+                rating: rating,
+                country: appState.currentCountry,
+                city: appState.currentCity,
+                date: dateVal ? new Date(dateVal).toISOString() : new Date().toISOString()
+            };
+
+            appState.activeExpenses.unshift(newTx);
+            currentInput = "0";
+            document.getElementById('numpadDisplay').innerText = "0";
+            document.getElementById('expenseNote').value = '';
+
+            saveState();
+            updateUI();
+            showToast("Log saved successfully!");
+        }
+
+        function deleteTransaction(id) {
+            appState.activeExpenses = appState.activeExpenses.filter(t => t.id !== id);
+            saveState();
+            updateUI();
+            if (!document.getElementById('view-analytics').classList.contains('hidden')) updateCharts();
+        }
+
+        function updateUI() {
+            document.getElementById('activeHeaderLocation').innerText = `${appState.currentCountry} / ${appState.currentCity}`;
+            document.getElementById('entryCurrencyCode').innerText = `${appState.logCurrency} ${CURRENCIES[appState.logCurrency].symbol}`;
+            document.getElementById('headerDisplayCurrency').innerText = `${appState.displayCurrency} (${CURRENCIES[appState.displayCurrency].symbol})`;
+            document.getElementById('displayCurrencyBadge').innerText = `${appState.displayCurrency} (${CURRENCIES[appState.displayCurrency].symbol})`;
+            document.getElementById('analyticsCurrencyCode').innerText = appState.displayCurrency;
+
+            let exp = 0, actInc = 0, pasInc = 0;
+            appState.activeExpenses.forEach(t => {
+                const converted = convertCurrency(t.amount, t.currency || appState.logCurrency, appState.displayCurrency);
+                if (t.type === 'expense') exp += converted;
+                else if (t.type === 'active_income') actInc += converted;
+                else if (t.type === 'passive_income') pasInc += converted;
+            });
+
+            const net = (actInc + pasInc) - exp;
+
+            document.getElementById('analyticsNetTotal').innerText = `${CURRENCIES[appState.displayCurrency].symbol}${net.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('analyticsTotalExpense').innerText = `${CURRENCIES[appState.displayCurrency].symbol}${exp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('analyticsActiveInc').innerText = `${CURRENCIES[appState.displayCurrency].symbol}${actInc.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('analyticsPassiveInc').innerText = `${CURRENCIES[appState.displayCurrency].symbol}${pasInc.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('historyCountTag').innerText = `${appState.activeExpenses.length} entries`;
+
+            renderHistoryList();
+        }
+
+        function renderHistoryList() {
+            const container = document.getElementById('historyList');
+            if (appState.activeExpenses.length === 0) {
+                container.innerHTML = `<p class="text-center text-sage-400 text-xs py-4">No transactions logged.</p>`;
+                return;
+            }
+
+            const expOnly = appState.activeExpenses.filter(t => t.type === 'expense');
+            const mean = expOnly.length > 0 ? (expOnly.reduce((s, e) => s + convertCurrency(e.amount, e.currency || appState.logCurrency, appState.displayCurrency), 0) / expOnly.length) : 0;
+
+            container.innerHTML = appState.activeExpenses.map(t => {
+                const converted = convertCurrency(t.amount, t.currency || appState.logCurrency, appState.displayCurrency);
+                const isSpike = t.type === 'expense' && converted > (mean * 2.0) && converted > 10;
+                
+                let colorClass = "text-rose-400";
+                let sign = "-";
+                if (t.type === 'active_income') { colorClass = "text-emerald-400"; sign = "+"; }
+                if (t.type === 'passive_income') { colorClass = "text-amber-400"; sign = "+"; }
+
+                const formattedDate = new Date(t.date).toLocaleDateString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+
+                return `
+                    <div onclick="deleteTransaction(${t.id})" class="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/80 border ${isSpike ? 'border-rose-500/50 bg-rose-950/20' : 'border-emerald-800/30'} text-xs active:scale-[0.99] transition-all">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-lg bg-emerald-900/60 text-slate-200 flex items-center justify-center text-xs border border-emerald-700/40">
+                                ${t.type === 'expense' ? '<i class="fa-solid fa-arrow-down text-rose-400"></i>' : '<i class="fa-solid fa-arrow-up text-emerald-400"></i>'}
+                            </div>
+                            <div>
+                                <div class="font-bold text-white flex items-center gap-1.5 text-[11px]">
+                                    ${t.note} <span class="text-[9px] text-sage-400">(${t.city})</span>
+                                    ${isSpike ? '<span class="text-[8px] bg-rose-500/20 text-rose-300 px-1 py-0.1 rounded border border-rose-500/30">Spike</span>' : ''}
+                                </div>
+                                <div class="text-[9px] text-sage-400">${formattedDate} • ${t.category}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-mono font-bold text-xs ${colorClass}">
+                                ${sign}${t.amount.toLocaleString()} ${t.currency || appState.logCurrency}
+                            </div>
+                            ${(t.currency || appState.logCurrency) !== appState.displayCurrency ? 
+                                `<div class="text-[9px] text-sage-400 font-mono">≈ ${sign}${CURRENCIES[appState.displayCurrency].symbol}${converted.toFixed(2)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function initCharts() {
+            const ctx1 = document.getElementById('countryChart').getContext('2d');
+            countryChartInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Net Spend', data: [], backgroundColor: '#4fbda9', borderRadius: 5 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        x: { ticks: { color: '#9bbfb5', font: { size: 9 } }, grid: { display: false } }, 
+                        y: { ticks: { color: '#9bbfb5', font: { size: 9 } }, grid: { color: 'rgba(79, 189, 169, 0.1)' } } 
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('cityChart').getContext('2d');
+            cityChartInstance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4fbda9', '#ecc14d', '#7ad4c3', '#d9a726', '#237063'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#eef5f3', font: { size: 9 } } } } }
+            });
+        }
+
+        function updateCharts() {
+            if (!countryChartInstance || !cityChartInstance) return;
+
+            const dailyMap = {};
+            appState.activeExpenses.forEach(t => {
+                const day = new Date(t.date).toLocaleDateString(undefined, {month:'short', day:'numeric'});
+                const converted = convertCurrency(t.amount, t.currency || appState.logCurrency, appState.displayCurrency);
+                const val = t.type === 'expense' ? converted : -converted;
+                dailyMap[day] = (dailyMap[day] || 0) + val;
+            });
+
+            const dates = Object.keys(dailyMap);
+            const values = Object.values(dailyMap);
+            const mean = values.reduce((a,b)=>a+b,0) / (values.length || 1);
+            const colors = values.map(v => v > (mean * 1.8) && v > 15 ? '#f43f5e' : '#4fbda9');
+
+            countryChartInstance.data.labels = dates;
+            countryChartInstance.data.datasets[0].data = values;
+            countryChartInstance.data.datasets[0].backgroundColor = colors;
+            countryChartInstance.update();
+
+            const cityMap = {};
+            appState.activeExpenses.filter(t => t.type === 'expense').forEach(t => {
+                const converted = convertCurrency(t.amount, t.currency || appState.logCurrency, appState.displayCurrency);
+                cityMap[t.city] = (cityMap[t.city] || 0) + converted;
+            });
+
+            cityChartInstance.data.labels = Object.keys(cityMap);
+            cityChartInstance.data.datasets[0].data = Object.values(cityMap);
+            cityChartInstance.update();
+        }
+
+        function renderAIInsights() {
+            const container = document.getElementById('aiAnalysisContainer');
+            const satContainer = document.getElementById('satisfactionContainer');
+
+            const expenses = appState.activeExpenses.filter(t => t.type === 'expense');
+            if (expenses.length === 0) {
+                container.innerHTML = `<p class="text-sage-400 italic text-xs">Log expenses to unlock AI recommendations.</p>`;
+                satContainer.innerHTML = `<p class="text-sage-400 italic text-xs">Rating matrix will render here.</p>`;
+                return;
+            }
+
+            const noodleDishes = expenses.filter(e => /noodle|pad thai|ramen|pho|soup/i.test(e.note));
+            const westernDishes = expenses.filter(e => /burger|pizza|steak|pasta|coffee|western/i.test(e.note));
+
+            let html = [];
+            if (noodleDishes.length > 0 && westernDishes.length > 0) {
+                const nAvg = noodleDishes.reduce((s,e)=>s+convertCurrency(e.amount, e.currency||appState.logCurrency, appState.displayCurrency),0) / noodleDishes.length;
+                const wAvg = westernDishes.reduce((s,e)=>s+convertCurrency(e.amount, e.currency||appState.logCurrency, appState.displayCurrency),0) / westernDishes.length;
+                const pct = Math.round(((wAvg - nAvg)/wAvg)*100);
+
+                html.push(`
+                    <div class="p-3 rounded-xl bg-emerald-950/80 border border-emerald-800/40 space-y-1">
+                        <div class="font-bold text-emerald-300 flex items-center gap-1.5"><i class="fa-solid fa-bowl-food text-amber-400"></i> Noodle Dishes vs Western Meals</div>
+                        <p class="text-sage-200 text-xs">Local noodles average <strong>${CURRENCIES[appState.displayCurrency].symbol}${nAvg.toFixed(2)}</strong> vs <strong>${CURRENCIES[appState.displayCurrency].symbol}${wAvg.toFixed(2)}</strong> for Western food (${pct}% savings!).</p>
+                    </div>
+                `);
+            } else {
+                html.push(`
+                    <div class="p-3 rounded-xl bg-emerald-950/80 border border-emerald-800/40 space-y-1">
+                        <div class="font-bold text-emerald-300 flex items-center gap-1.5"><i class="fa-solid fa-lightbulb text-amber-400"></i> Smart Spending AI</div>
+                        <p class="text-sage-200 text-xs">Log specific items (e.g., "Pad Thai noodles" or "Burger") to calculate itemized spending comparisons.</p>
+                    </div>
+                `);
+            }
+
+            container.innerHTML = html.join('');
+
+            const catRatings = {};
+            expenses.forEach(e => {
+                const converted = convertCurrency(e.amount, e.currency || appState.logCurrency, appState.displayCurrency);
+                if (!catRatings[e.category]) catRatings[e.category] = { rating: 0, count: 0, spend: 0 };
+                catRatings[e.category].rating += (e.rating || 3);
+                catRatings[e.category].spend += converted;
+                catRatings[e.category].count += 1;
+            });
+
+            satContainer.innerHTML = Object.keys(catRatings).map(cat => {
+                const item = catRatings[cat];
+                const avg = (item.rating / item.count).toFixed(1);
+                return `
+                    <div class="flex justify-between items-center p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-800/40">
+                        <div>
+                            <div class="font-bold text-white text-xs">${cat}</div>
+                            <div class="text-[9px] text-sage-400">${item.count} purchases</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-amber-400 font-bold text-xs">${avg} / 5.0 ★</div>
+                            <div class="text-[9px] font-mono text-sage-300">${CURRENCIES[appState.displayCurrency].symbol}${item.spend.toFixed(2)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addRecurringRule() {
+            const title = document.getElementById('recTitle').value.trim();
+            const amount = parseFloat(document.getElementById('recAmount').value);
+            const type = document.getElementById('recType').value;
+            const freq = document.getElementById('recFreq').value;
+            const cat = document.getElementById('recCat').value;
+
+            if (!title || isNaN(amount)) return;
+
+            appState.recurringRules.push({
+                id: Date.now(), title, amount, currency: appState.logCurrency, type, freq, cat
+            });
+
+            document.getElementById('recTitle').value = '';
+            document.getElementById('recAmount').value = '';
+            saveState();
+            renderRecurringRules();
+            showToast("Recurring rule created");
+        }
+
+        function deleteRecurringRule(id) {
+            appState.recurringRules = appState.recurringRules.filter(r => r.id !== id);
+            saveState();
+            renderRecurringRules();
+        }
+
+        function renderRecurringRules() {
+            const container = document.getElementById('recurringList');
+            if (appState.recurringRules.length === 0) {
+                container.innerHTML = `<p class="text-sage-400 italic text-xs py-1">No active recurring rules.</p>`;
+                return;
+            }
+
+            container.innerHTML = appState.recurringRules.map(r => `
+                <div class="flex justify-between items-center p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-800/40">
+                    <div>
+                        <div class="font-bold text-white">${r.title} <span class="text-[9px] text-emerald-400">(${r.freq})</span></div>
+                        <div class="text-[9px] text-sage-400">${r.type} • ${r.cat}</div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <span class="font-mono font-bold text-white">${r.amount.toLocaleString()} ${r.currency}</span>
+                        <button onclick="deleteRecurringRule(${r.id})" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function promptCloseTab(type) {
+            pendingCloseType = type;
+            const title = type === 'city' ? `Close Active City Tab (${appState.currentCity})` : `Close Country Tab (${appState.currentCountry})`;
+            document.getElementById('closeTabModalTitle').innerText = title;
+            document.getElementById('customArchiveNameInput').value = `${appState.currentCity} Trip`;
+            document.getElementById('closeTabModal').classList.remove('hidden');
+        }
+
+        function closeCloseTabModal() {
+            document.getElementById('closeTabModal').classList.add('hidden');
+        }
+
+        function executeCloseTab() {
+            const customName = document.getElementById('customArchiveNameInput').value.trim() || appState.currentCity;
+
+            if (!appState.vault[appState.currentCountry]) {
+                appState.vault[appState.currentCountry] = {};
+            }
+
+            appState.vault[appState.currentCountry][customName] = [...appState.activeExpenses];
+
+            if (pendingCloseType === 'city') {
+                appState.currentCity = "New City Segment";
+                appState.activeExpenses = [];
+            } else {
+                appState.currentCountry = "New Country Destination";
+                appState.currentCity = "Main City";
+                appState.activeExpenses = [];
+            }
+
+            saveState();
+            updateUI();
+            closeCloseTabModal();
+            switchTab('archive');
+            showToast("Tab archived to Vault!");
+        }
+
+        function renderHierarchicalVault() {
+            const container = document.getElementById('vaultHierarchicalContainer');
+            const countries = Object.keys(appState.vault);
+
+            if (countries.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-sage-400 text-xs">
+                        <i class="fa-solid fa-folder-tree text-2xl mb-2 block opacity-40"></i>
+                        No closed archives. Tap "Close City" or "Close Country" to freeze trip logs.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = countries.map(country => {
+                const cities = appState.vault[country];
+                const cityKeys = Object.keys(cities);
+
+                const citiesHTML = cityKeys.map(city => {
+                    const txs = cities[city];
+                    const totalSpend = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+convertCurrency(t.amount, t.currency||appState.logCurrency, appState.displayCurrency),0);
+                    return `
+                        <div class="bg-emerald-950 p-2.5 rounded-xl border border-emerald-800/40 flex justify-between items-center text-xs">
+                            <div>
+                                <div class="font-bold text-white">${city}</div>
+                                <div class="text-[9px] text-sage-400">${txs.length} transactions</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-mono font-bold text-amber-400">${CURRENCIES[appState.displayCurrency].symbol}${totalSpend.toFixed(2)}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="glass-card rounded-2xl p-3 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-extrabold text-xs text-white flex items-center gap-1.5">
+                                <i class="fa-solid fa-flag text-amber-400"></i> ${country}
+                            </h4>
+                            <span class="text-[9px] text-sage-400">${cityKeys.length} subfolders</span>
+                        </div>
+                        <div class="space-y-1.5 pt-0.5">
+                            ${citiesHTML}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openLocationModal() {
+            document.getElementById('modalCountryInput').value = appState.currentCountry;
+            document.getElementById('modalCityInput').value = appState.currentCity;
+            document.getElementById('locationModal').classList.remove('hidden');
+        }
+
+        function closeLocationModal() {
+            document.getElementById('locationModal').classList.add('hidden');
+        }
+
+        function saveLocationSettings() {
+            const c = document.getElementById('modalCountryInput').value.trim();
+            const ct = document.getElementById('modalCityInput').value.trim();
+
+            if (c) appState.currentCountry = c;
+            if (ct) appState.currentCity = ct;
+
+            saveState();
+            updateUI();
+            closeLocationModal();
+            showToast("Location updated");
+        }
+
+        window.onload = function() {
+            initApp();
+        };
+    </script>
+</body>
+</html>
